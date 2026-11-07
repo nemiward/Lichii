@@ -422,6 +422,11 @@ RasterizerVulkan::RasterizerVulkan(Core::Frontend::EmuWindow& emu_window_, Tegra
         [this](const std::function<void(DAddr, size_t)>& callback) {
             gpu.ForEachPendingCpuWrite(callback);
         });
+    if (MeshEmulation::Enabled() &&
+        (!device.IsExtMeshShaderSupported() || MeshEmulation::Forced())) {
+        mesh_emulation = std::make_unique<MeshEmulation>(device, memory_allocator);
+        pipeline_cache.SetMeshEmulation(mesh_emulation.get());
+    }
     VideoCommon::GpuSplit::Get().SetIdleHook(
         [](void* argument) { static_cast<Scheduler*>(argument)->FlushDeferred(); },
         &scheduler);
@@ -597,6 +602,7 @@ void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_in
     }
     // Task/mesh pipelines: the draw's vertex count is the number of task workgroups.
     mesh_draw = pipeline->IsMeshPipeline();
+    emulated_mesh_pipeline = pipeline->IsEmulatedMeshStages() ? pipeline : nullptr;
     // EDEN_NX2_NO_MESH=1: skip task/mesh draws as before they were supported (A/B comparisons).
     // EDEN_NX2_NO_MESH_FILE=<path>: skip them while that file exists (checked every 1024 draws),
     // to compare the same scene with and without them in one run.
@@ -1116,6 +1122,10 @@ void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
             ++trace_zero_direct;
         }
 
+        if (emulated_mesh_pipeline) {
+            emulated_mesh_pipeline->DrawEmulatedMesh(draw_params.num_vertices);
+            return;
+        }
         if (mesh_draw && mesh_emulation_vertices_per_group != 0) {
             const u32 vertices{mesh_emulation_groups * mesh_emulation_vertices_per_group};
             if (vertices == 0) {
@@ -1201,7 +1211,7 @@ void RasterizerVulkan::DrawIndirect() {
                       params.count_start_address, params.buffer_size, params.max_draw_counts,
                       params.stride, params.include_count, params.is_byte_count, mesh_draw);
         }
-        if (mesh_draw) {
+        if (mesh_draw || emulated_mesh_pipeline) {
             TraceDrawFailure("indirect task/mesh unsupported");
             // Indirect task/mesh draws would need vkCmdDrawMeshTasksIndirectEXT's layout.
             static bool logged{};

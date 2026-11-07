@@ -561,6 +561,9 @@ Id EmitWorkgroupId(EmitContext& ctx) {
         return ctx.OpCompositeConstruct(ctx.U32[3], ctx.OpLoad(ctx.U32[1], ctx.mesh_group_index),
                                         zero, zero);
     }
+    if (ctx.emulate_mesh && ctx.stage == Stage::Mesh) {
+        return EmitMeshWorkgroupId(ctx);
+    }
     return ctx.OpLoad(ctx.U32[3], ctx.workgroup_id);
 }
 

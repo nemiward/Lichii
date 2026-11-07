@@ -92,6 +92,8 @@ set(SHADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/vulkan_present_scaleforce_fp32.frag
     ${CMAKE_CURRENT_SOURCE_DIR}/vulkan_quad_indexed.comp
     ${CMAKE_CURRENT_SOURCE_DIR}/vulkan_turbo_mode.comp
+    ${CMAKE_CURRENT_SOURCE_DIR}/mesh_emulation_finalize.comp
+    ${CMAKE_CURRENT_SOURCE_DIR}/mesh_emulation_scan.comp
     ${CMAKE_CURRENT_SOURCE_DIR}/vulkan_uint8.comp
 
     # Snapdragon Game Super Resolution

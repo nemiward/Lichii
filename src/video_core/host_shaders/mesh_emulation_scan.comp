@@ -1,0 +1,96 @@
+// SPDX-FileCopyrightText: Copyright 2026 Eden Emulator Project
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Between an emulated task program and its mesh program (see MESH_EMULATION.md). Each task
+// workgroup wrote a record whose word 1 is the number of mesh workgroups it launches. This pass,
+// run as a single workgroup, numbers the mesh workgroups of all tasks in order and writes
+//  - the mesh map: for each mesh workgroup, {its task workgroup, its index within that task};
+//  - the arguments of the mesh dispatch and of the final draw (vkCmdDispatchIndirect at byte 0,
+//    vkCmdDrawIndirect at byte 16) and, at byte 32, the number of mesh workgroups for
+//    vkCmdDrawIndirectCount (mesh_emulation_finalize.comp writes one command per workgroup).
+// The total is clamped to max_mesh_groups, the capacity of the mesh output slots.
+// record_words = 0 means there is no task program: task_groups is the number of mesh workgroups.
+
+#version 460 core
+
+layout (local_size_x = 1024) in;
+
+layout (std430, set = 0, binding = 0) readonly buffer TaskRecords {
+    uint records[];
+};
+
+layout (std430, set = 0, binding = 1) writeonly buffer MeshMap {
+    uvec2 mesh_map[];
+};
+
+layout (std430, set = 0, binding = 2) buffer Arguments {
+    uint args[16];
+};
+
+layout (push_constant) uniform Parameters {
+    uint task_groups;
+    uint record_words;
+    uint max_mesh_groups;
+    uint vertices_per_group; // vertices the final draw spends per mesh workgroup
+};
+
+shared uint scan[1024];
+
+void write_arguments(uint total) {
+    args[0] = total; // dispatch x, y, z
+    args[1] = 1;
+    args[2] = 1;
+    args[3] = 0;
+    args[4] = total * vertices_per_group; // draw: vertex, instance, first vertex, first instance
+    args[5] = 1;
+    args[6] = 0;
+    args[7] = 0;
+    args[8] = total; // draw count of the one-draw-per-meshlet path
+}
+
+void main() {
+    const uint id = gl_LocalInvocationID.x;
+    if (record_words == 0) {
+        // A pipeline without a task program: task_groups is already the number of mesh
+        // workgroups, all of them launched by the one (empty) task record.
+        const uint total = min(task_groups, max_mesh_groups);
+        for (uint group = id; group < total; group += 1024) {
+            mesh_map[group] = uvec2(0, group);
+        }
+        if (id == 0) {
+            write_arguments(total);
+        }
+        return;
+    }
+    uint running = 0;
+    for (uint first = 0; first < task_groups; first += 1024) {
+        const uint task = first + id;
+        uint count = 0;
+        if (task < task_groups) {
+            count = min(records[task * record_words + 1], max_mesh_groups);
+        }
+        // Inclusive scan of the counts of this chunk of 1024 tasks.
+        scan[id] = count;
+        barrier();
+        for (uint offset = 1; offset < 1024; offset <<= 1) {
+            const uint other = id >= offset ? scan[id - offset] : 0;
+            barrier();
+            scan[id] += other;
+            barrier();
+        }
+        const uint base = running + scan[id] - count;
+        for (uint i = 0; i < count; ++i) {
+            const uint index = base + i;
+            if (index >= max_mesh_groups) {
+                break;
+            }
+            mesh_map[index] = uvec2(task, i);
+        }
+        const uint chunk_total = scan[1023];
+        barrier();
+        running = min(running + chunk_total, max_mesh_groups);
+    }
+    if (id == 0) {
+        write_arguments(running);
+    }
+}

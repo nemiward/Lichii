@@ -289,9 +289,10 @@ void DefineEntryPoint(const IR::Program& program, EmitContext& ctx, Id main) {
         execution_model = spv::ExecutionModel::Vertex;
         break;
     case Stage::Task:
-        // Mesh emulation runs task programs as compute shaders too.
-        execution_model = ctx.runtime_info.mesh_as_compute ? spv::ExecutionModel::GLCompute
-                                                           : spv::ExecutionModel::TaskEXT;
+        // Both mesh emulations run task programs as compute shaders.
+        execution_model = ctx.emulate_mesh || ctx.runtime_info.mesh_as_compute
+                              ? spv::ExecutionModel::GLCompute
+                              : spv::ExecutionModel::TaskEXT;
         ctx.AddExecutionMode(main, spv::ExecutionMode::LocalSize, program.workgroup_size[0], 1U,
                              1U);
         break;
@@ -303,9 +304,13 @@ void DefineEntryPoint(const IR::Program& program, EmitContext& ctx, Id main) {
                                  1U, 1U);
             break;
         }
-        execution_model = spv::ExecutionModel::MeshEXT;
         ctx.AddExecutionMode(main, spv::ExecutionMode::LocalSize, program.workgroup_size[0], 1U,
                              1U);
+        if (ctx.emulate_mesh) {
+            execution_model = spv::ExecutionModel::GLCompute;
+            break;
+        }
+        execution_model = spv::ExecutionModel::MeshEXT;
         ctx.AddExecutionMode(main, spv::ExecutionMode::OutputVertices, program.mesh.max_vertices);
         ctx.AddExecutionMode(main, spv::ExecutionMode::OutputPrimitivesEXT,
                              program.mesh.max_primitives);
