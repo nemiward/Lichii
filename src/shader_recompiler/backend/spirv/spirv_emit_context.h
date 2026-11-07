@@ -402,6 +402,9 @@ public:
     //  - emu_mesh_slots (mesh): emu_slot_words words per mesh workgroup: [0] primitive count,
     //    then the vertex index map (one word per map byte), then the attribute lines.
     bool emulate_mesh{};
+    // Diagnostic (EDEN_NX2_MESH_EMU_FSDEBUG=albedo): first sampled colour of an emulated fragment
+    // shader, written unlit to colour target 0.
+    Id debug_albedo{};
     /// The stage whose subgroup support applies: an emulated task or mesh program runs as a
     /// compute shader, whatever the device says about the task and mesh stages.
     [[nodiscard]] Stage SubgroupStage() const noexcept {

@@ -97,6 +97,7 @@ struct EmulatedMeshStages {
     std::vector<u32> vertex_lines;
     bool task_warp_ops{}; ///< run the compute pipeline at the guest's warp size
     bool mesh_warp_ops{};
+    u32 texture_logs{};   ///< diagnostic logs of the fragment shader textures
     u32 draws{};          ///< emulated draws so far (logged at powers of two)
     u32 dumps{};          ///< buffer dumps taken (EDEN_NX2_MESH_EMU_DUMP_DIR)
     std::array<u32, NUM_TEXTURE_AND_IMAGE_SCALING_WORDS> push_rescaling{};

@@ -79,6 +79,7 @@ MeshEmulation::Decision MeshEmulation::Decide(u64 mesh_hash) {
     static bool no_draw{};
     static bool per_meshlet{};
     static bool depth_leq{};
+    static bool no_depth{};
     static bool mask_pos{};
     static bool reassert{true};
     static bool skip_shadow{}, skip_half{}, skip_prepass{};
@@ -90,6 +91,7 @@ MeshEmulation::Decision MeshEmulation::Decide(u64 mesh_hash) {
         no_draw = false;
         per_meshlet = false;
         depth_leq = false;
+        no_depth = false;
         mask_pos = false;
         reassert = true;
         skip_shadow = skip_half = skip_prepass = false;
@@ -104,6 +106,8 @@ MeshEmulation::Decision MeshEmulation::Decide(u64 mesh_hash) {
                 per_meshlet = true;
             } else if (token == "depthleq") {
                 depth_leq = true;
+            } else if (token == "nodepth") {
+                no_depth = true;
             } else if (token == "maskpos") {
                 mask_pos = true;
             } else if (token == "noreassert") {
@@ -120,7 +124,7 @@ MeshEmulation::Decision MeshEmulation::Decide(u64 mesh_hash) {
         }
     }
     return {.run = all || allowed.contains(mesh_hash), .draw = !no_draw,
-            .per_meshlet = per_meshlet, .depth_leq = depth_leq,
+            .per_meshlet = per_meshlet, .no_depth = no_depth, .depth_leq = depth_leq,
             .mask_pos = mask_pos, .reassert = reassert,
             .skip_shadow = skip_shadow, .skip_half = skip_half,
             .skip_prepass = skip_prepass};

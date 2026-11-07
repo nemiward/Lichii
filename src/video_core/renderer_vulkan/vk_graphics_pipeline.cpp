@@ -541,6 +541,38 @@ bool GraphicsPipeline::ConfigureImpl(bool is_indexed) {
         texture_cache.FillImageViews(std::span(views.data(), views.size()), false,
                                      Spec::has_images);
     }
+    if (emulated_mesh && emulated_mesh->texture_logs < 3) {
+        // Diagnostic: what the fragment shader of an emulated pipeline really samples.
+        if constexpr (Spec::enabled_stages[4]) {
+            ++emulated_mesh->texture_logs;
+            size_t index{};
+            for (size_t stage = 0; stage < 4; ++stage) {
+                if (Spec::enabled_stages[stage]) {
+                    index += Shader::NumDescriptors(stage_infos[stage].texture_descriptors);
+                }
+            }
+            const Shader::Info& fs{stage_infos[4]};
+            LOG_INFO(Render_Vulkan,
+                     "Emulated FS textures: mesh {:#018x} (draw {}): {} textures, {} cbufs, {} "
+                     "ssbos",
+                     emulated_mesh->mesh_hash, emulated_mesh->draws,
+                     Shader::NumDescriptors(fs.texture_descriptors),
+                     fs.constant_buffer_descriptors.size(), fs.storage_buffers_descriptors.size());
+            const u32 count = Shader::NumDescriptors(fs.texture_descriptors);
+            for (u32 i = 0; i < count && index + i < views.size(); ++i) {
+                const auto id = views[index + i].id;
+                const bool null_view = id == VideoCommon::NULL_IMAGE_VIEW_ID;
+                if (null_view) {
+                    LOG_INFO(Render_Vulkan, "  texture {}: NULL image", i);
+                } else {
+                    const auto& view = texture_cache.GetImageView(id);
+                    LOG_INFO(Render_Vulkan, "  texture {}: format {} size {}x{}x{}", i,
+                             static_cast<int>(view.format), view.size.width, view.size.height,
+                             view.size.depth);
+                }
+            }
+        }
+    }
     if (RecordingSampledTextures()) {
         sampled_images.clear();
         size_t view_index{};
@@ -1383,6 +1415,23 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
                  regs.color_mask[0].raw, regs.rt[0].width, regs.rt[0].height,
                  static_cast<u32>(regs.rt[0].format), regs.viewport_transform[0].scale_x,
                  regs.viewport_transform[0].scale_y, emulated_mesh->position_only);
+        const auto& blend{regs.blend_per_target_enabled ? regs.blend_per_target[0]
+                                                         : regs.blend_per_target[0]};
+        LOG_INFO(Render_Vulkan,
+                 "  blend0 enable={} per_target={} global: op={:#x} src={:#x} dst={:#x} aop={:#x} "
+                 "asrc={:#x} adst={:#x} | per-target0: op={:#x} src={:#x} dst={:#x} aop={:#x} "
+                 "asrc={:#x} adst={:#x} | formats rt0..3 = {} {} {} {} cmask {:#x} {:#x} {:#x} {:#x}",
+                 regs.blend.enable[0], regs.blend_per_target_enabled,
+                 static_cast<u32>(regs.blend.color_op), static_cast<u32>(regs.blend.color_source),
+                 static_cast<u32>(regs.blend.color_dest), static_cast<u32>(regs.blend.alpha_op),
+                 static_cast<u32>(regs.blend.alpha_source), static_cast<u32>(regs.blend.alpha_dest),
+                 static_cast<u32>(blend.color_op), static_cast<u32>(blend.color_source),
+                 static_cast<u32>(blend.color_dest), static_cast<u32>(blend.alpha_op),
+                 static_cast<u32>(blend.alpha_source), static_cast<u32>(blend.alpha_dest),
+                 static_cast<u32>(regs.rt[0].format), static_cast<u32>(regs.rt[1].format),
+                 static_cast<u32>(regs.rt[2].format), static_cast<u32>(regs.rt[3].format),
+                 regs.color_mask[0].raw, regs.color_mask[1].raw, regs.color_mask[2].raw,
+                 regs.color_mask[3].raw);
     }
     if (!decision.run) {
         return;
@@ -1462,7 +1511,10 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
     const auto guest_depth_func{maxwell3d->regs.depth_test_func};
     const bool relax_depth{decision.depth_leq && key.state.extended_dynamic_state != 0 &&
                            maxwell3d->regs.depth_test_enable != 0 &&
-                           static_cast<u32>(guest_depth_func) == 3 /* EQUAL */};
+                           (static_cast<u32>(guest_depth_func) == 3 /* EQUAL */ ||
+                            (decision.no_depth && maxwell3d->regs.color_mask[0].raw != 0))};
+    const VkCompareOp relaxed_op{decision.no_depth ? VK_COMPARE_OP_ALWAYS
+                                                   : VK_COMPARE_OP_LESS_OR_EQUAL};
     // Color writes of a position-only pipeline off (the guest masks them): a test of whether the
     // dynamic color write mask reaches the emulated draw.
     // How the guest's color writes reach this pipeline: the dynamic mask of extended dynamic state 3
@@ -1483,7 +1535,7 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
                              (mask.A ? VK_COLOR_COMPONENT_A_BIT : 0u);
         guest_enables[index] = guest_masks[index] != 0 ? VK_TRUE : VK_FALSE;
     }
-    scheduler.Record([this, per_meshlet = decision.per_meshlet, relax_depth, guest_depth_func,
+    scheduler.Record([this, per_meshlet = decision.per_meshlet, relax_depth, relaxed_op, guest_depth_func,
                       force_no_color, reassert_color, dynamic_mask, guest_masks, guest_enables,
                       max_commands = system.MaxMeshGroups(emulated_mesh->slot_words)](
                          vk::CommandBuffer cmdbuf) {
@@ -1510,7 +1562,7 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
             cmdbuf.SetPrimitiveTopologyEXT(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
         }
         if (relax_depth) {
-            cmdbuf.SetDepthCompareOpEXT(VK_COMPARE_OP_LESS_OR_EQUAL);
+            cmdbuf.SetDepthCompareOpEXT(relaxed_op);
         }
         if (force_no_color) {
             if (dynamic_mask) {
