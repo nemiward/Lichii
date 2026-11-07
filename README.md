@@ -26,14 +26,10 @@ Not tested on other GPUs yet.
 **How to use it:** nothing to set up. It turns on by itself on GPUs without mesh shaders and
 does nothing on the others. To turn it off, start Lichii with `EDEN_NX2_MESH_EMU=0`.
 
-**Installing on Linux:** this fork adds `dist/linux/install-lichii.sh`. It installs Lichii for
-your user, with a `lichii` command and an entry in the applications menu:
-
-```sh
-dist/linux/install-lichii.sh --appimage lichii-linux-x86_64.AppImage   # a downloaded AppImage
-dist/linux/install-lichii.sh --build                                   # compile and install
-dist/linux/install-lichii.sh --uninstall
-```
+**Compiling and installing on Linux:** clone this repository and run
+`dist/linux/install-lichii.sh`. It compiles Lichii and installs it for your user, with a `lichii`
+command and an entry in the applications menu (`--uninstall` removes it). The build dependencies
+are in [docs/Deps.md](docs/Deps.md).
 
 Back up your saves first.
 
