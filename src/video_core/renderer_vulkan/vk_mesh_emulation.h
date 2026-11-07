@@ -40,6 +40,7 @@ public:
         bool draw{true};         ///< and draw what they wrote
         bool per_meshlet{false}; ///< one draw command per mesh workgroup, so gl_PrimitiveID
                                  ///< restarts in each, as with mesh shaders
+        bool no_depth{false};    ///< depth compare ALWAYS for draws that write colour (diagnostic)
         bool depth_leq{false};   ///< test depth with LESS_OR_EQUAL where the guest uses EQUAL
         bool mask_pos{false};    ///< no color writes in position-only pipelines (a depth prepass)
         bool reassert{true};     ///< record the guest's color write state again before the draw
