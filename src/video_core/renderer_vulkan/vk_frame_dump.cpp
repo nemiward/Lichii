@@ -512,7 +512,7 @@ void FrameDump::NoteLaunch(u64 shader_hash, const std::array<u32, 3>& grid,
 void FrameDump::NoteDraw(std::span<const u64> shader_hashes) {
     ++draws;
     for (const u64 hash : shader_hashes) {
-        if (hash != 0 && pass_hashes.size() < 32 &&
+        if (hash != 0 && pass_hashes.size() < 512 &&
             std::ranges::find(pass_hashes, hash) == pass_hashes.end()) {
             pass_hashes.push_back(hash);
         }
