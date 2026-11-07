@@ -1530,7 +1530,7 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
     for (size_t index = 0; index < guest_masks.size(); ++index) {
         const auto& mask{maxwell3d->regs.color_mask[maxwell3d->regs.color_mask_common ? 0 : index]};
         const auto bit = [](bool set, VkColorComponentFlagBits flag) -> VkColorComponentFlags {
-            return set ? VkColorComponentFlags{flag} : VkColorComponentFlags{0};
+            return set ? static_cast<VkColorComponentFlags>(flag) : VkColorComponentFlags{0};
         };
         guest_masks[index] = bit(mask.R, VK_COLOR_COMPONENT_R_BIT) |
                              bit(mask.G, VK_COLOR_COMPONENT_G_BIT) |
