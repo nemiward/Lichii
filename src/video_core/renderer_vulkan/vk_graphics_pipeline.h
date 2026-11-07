@@ -99,6 +99,10 @@ struct EmulatedMeshStages {
     bool mesh_warp_ops{};
     u32 draws{};          ///< emulated draws so far (logged at powers of two)
     u32 dumps{};          ///< buffer dumps taken (EDEN_NX2_MESH_EMU_DUMP_DIR)
+    std::array<u32, NUM_TEXTURE_AND_IMAGE_SCALING_WORDS> push_rescaling{};
+    f32 push_scale_down_factor{1.0f};
+    bool push_uses_render_area{};
+    std::array<f32, 4> push_render_area{};
 };
 
 class GraphicsPipeline {

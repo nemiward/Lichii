@@ -4839,8 +4839,8 @@ void Framebuffer::CreateFramebuffer(TextureCacheRuntime& runtime,
         .renderPass = renderpass,
         .attachmentCount = static_cast<u32>(attachments.size()),
         .pAttachments = attachments.data(),
-        .width = render_area.width,
-        .height = render_area.height,
+        .width = std::min(render_area.width, runtime.device.GetMaxFramebufferWidth()),
+        .height = std::min(render_area.height, runtime.device.GetMaxFramebufferHeight()),
         .layers = layers,
     });
 }

@@ -836,6 +836,13 @@ bool GraphicsPipeline::ConfigureDraw(const RescalingPushConstant& rescaling,
             cmdbuf.PushConstants(*pipeline_layout, push_stages, RENDERAREA_LAYOUT_OFFSET,
                                  sizeof(render_area_data), &render_area_data);
         }
+        if (emulated_mesh) {
+            const f32 config_down_factor{Settings::values.resolution_info.down_factor};
+            emulated_mesh->push_rescaling = rescaling_data;
+            emulated_mesh->push_scale_down_factor = is_rescaling ? config_down_factor : 1.0f;
+            emulated_mesh->push_uses_render_area = uses_render_area;
+            emulated_mesh->push_render_area = render_area_data;
+        }
         if (!descriptor_set_layout) {
             return;
         }
@@ -1479,9 +1486,22 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups) {
         if (scheduler.GraphicsPipelineMissing() || emulated_stage_set == VkDescriptorSet{}) {
             return;
         }
-        const VkDescriptorSet emulation_set{emulated_mesh->system->Set()};
-        cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline_layout, 1,
-                                  emulation_set, nullptr);
+        cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
+        const std::array<VkDescriptorSet, 2> sets{emulated_stage_set, emulated_mesh->system->Set()};
+        cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline_layout, 0,
+                                  sets, nullptr);
+        const VkShaderStageFlags push_stages =
+            VK_SHADER_STAGE_ALL_GRAPHICS | VK_SHADER_STAGE_COMPUTE_BIT;
+        cmdbuf.PushConstants(*pipeline_layout, push_stages, RESCALING_LAYOUT_WORDS_OFFSET,
+                             sizeof(emulated_mesh->push_rescaling),
+                             emulated_mesh->push_rescaling.data());
+        cmdbuf.PushConstants(*pipeline_layout, push_stages, RESCALING_LAYOUT_DOWN_FACTOR_OFFSET,
+                             sizeof(f32), &emulated_mesh->push_scale_down_factor);
+        if (emulated_mesh->push_uses_render_area) {
+            cmdbuf.PushConstants(*pipeline_layout, push_stages, RENDERAREA_LAYOUT_OFFSET,
+                                 sizeof(emulated_mesh->push_render_area),
+                                 emulated_mesh->push_render_area.data());
+        }
         if (key.state.extended_dynamic_state != 0) {
             cmdbuf.SetPrimitiveTopologyEXT(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
         }
