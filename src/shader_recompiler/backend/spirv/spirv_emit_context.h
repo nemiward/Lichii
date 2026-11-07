@@ -395,6 +395,24 @@ public:
     std::array<Id, 2> mesh_outputs_marker{};
     std::array<Id, 4> mesh_tasks_marker{};
 
+    // RuntimeInfo::emulate_mesh. Storage buffers (u32 arrays):
+    //  - emu_task_records: one record of payload_words words per task workgroup; word 1 is the
+    //    number of mesh workgroups it launches. Written by the task, read by the mesh.
+    //  - emu_mesh_map (mesh): two words per mesh workgroup, {task workgroup, index within it}.
+    //  - emu_mesh_slots (mesh): emu_slot_words words per mesh workgroup: [0] primitive count,
+    //    then the vertex index map (one word per map byte), then the attribute lines.
+    bool emulate_mesh{};
+    /// The stage whose subgroup support applies: an emulated task or mesh program runs as a
+    /// compute shader, whatever the device says about the task and mesh stages.
+    [[nodiscard]] Stage SubgroupStage() const noexcept {
+        return emulate_mesh ? Stage::Compute : stage;
+    }
+    Id emu_task_records{};
+    Id emu_mesh_map{};
+    Id emu_mesh_slots{};
+    Id emu_u32_ptr{}; ///< StorageBuffer pointer to one word
+    u32 emu_slot_words{};
+
     Id load_const_func_u8{};
     Id load_const_func_u16{};
     Id load_const_func_u32{};
@@ -435,6 +453,7 @@ private:
     void DefineInputs(const IR::Program& program);
     void DefineOutputs(const IR::Program& program);
     void DefineMesh(const IR::Program& program);
+    void DefineMeshEmulation(IR::Program& program);
 };
 
 } // namespace Shader::Backend::SPIRV

@@ -200,6 +200,8 @@ add_library(video_core STATIC
     renderer_vulkan/vk_frame_dump.cpp
     renderer_vulkan/vk_frame_dump.h
     renderer_vulkan/vk_graphics_pipeline.cpp
+    renderer_vulkan/vk_mesh_emulation.cpp
+    renderer_vulkan/vk_mesh_emulation.h
     renderer_vulkan/vk_graphics_pipeline.h
     renderer_vulkan/vk_multi_range_buffer.cpp
     renderer_vulkan/vk_multi_range_buffer.h

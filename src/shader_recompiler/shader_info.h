@@ -269,7 +269,54 @@ struct MeshInfo {
     u32 topology{}; ///< SET_MESH_SHADER_A output topology (4 = triangles)
     boost::container::static_vector<u32, 136> vertex_lines;
     boost::container::static_vector<u32, 136> primitive_lines;
+
+    // Set by the SPIR-V backend when the program is emitted as a compute shader
+    // (RuntimeInfo::emulate_mesh). The emulation buffers live in their own descriptor set
+    // (MESH_EMULATION_SET), so the program's own bindings are unchanged.
+    u32 emu_buffer_count{};
+    u32 emu_slot_words{};     ///< words per mesh output slot (mesh programs)
+    u32 emu_attribute_base{}; ///< first attribute word within a slot (mesh programs)
 };
+
+/// Layout of the buffers task and mesh programs exchange when they run as compute shaders
+/// (RuntimeInfo::emulate_mesh). Descriptor set MESH_EMULATION_SET, storage buffers of words:
+/// task records (task: write, mesh: read), mesh group map and mesh output slots.
+constexpr u32 MESH_EMULATION_SET = 1;
+constexpr u32 MESH_EMULATION_TASK_RECORDS = 0;
+constexpr u32 MESH_EMULATION_MESH_MAP = 1;
+constexpr u32 MESH_EMULATION_MESH_SLOTS = 2;
+
+/// Words in one mesh output slot: the primitive count, the vertex index map and the attributes.
+constexpr u32 MeshSlotWords(u32 map_words, u32 attribute_words) {
+    return 1 + map_words + attribute_words;
+}
+
+/// Where each part of a mesh program's output sits, in words: the shared-memory regions the
+/// program fills (vertex attributes in groups of 32, then primitive attributes in groups of 32;
+/// the vertex index map, one word per byte) and their copy in an emulated output slot.
+struct MeshSlotLayout {
+    u32 primitive_base{};   ///< first primitive attribute word within the attribute region
+    u32 attribute_words{};
+    u32 map_words{};
+    u32 attribute_base{};   ///< first attribute word within a slot
+    u32 slot_words{};
+};
+
+constexpr MeshSlotLayout MakeMeshSlotLayout(const MeshInfo& mesh) {
+    const auto groups = [](u32 count) { return (count + 31) / 32; };
+    MeshSlotLayout layout;
+    layout.primitive_base = groups(mesh.max_vertices) * static_cast<u32>(mesh.vertex_lines.size()) * 32;
+    layout.attribute_words =
+        layout.primitive_base +
+        groups(mesh.max_primitives) * static_cast<u32>(mesh.primitive_lines.size()) * 32;
+    if (layout.attribute_words == 0) {
+        layout.attribute_words = 1;
+    }
+    layout.map_words = 4 + 3 * mesh.max_primitives;
+    layout.attribute_base = 1 + layout.map_words;
+    layout.slot_words = MeshSlotWords(layout.map_words, layout.attribute_words);
+    return layout;
+}
 
 struct Info {
     static constexpr size_t MAX_INDIRECT_CBUFS{14};

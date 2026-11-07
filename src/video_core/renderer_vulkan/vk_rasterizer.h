@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include <array>
 #include <optional>
 #include <string_view>
@@ -24,6 +26,7 @@
 #include "video_core/renderer_vulkan/vk_descriptor_buffer.h"
 #include "video_core/renderer_vulkan/vk_descriptor_pool.h"
 #include "video_core/renderer_vulkan/vk_fence_manager.h"
+#include "video_core/renderer_vulkan/vk_mesh_emulation.h"
 #include "video_core/renderer_vulkan/vk_pipeline_cache.h"
 #include "video_core/renderer_vulkan/vk_query_cache.h"
 #include "video_core/renderer_vulkan/vk_render_pass_cache.h"
@@ -263,6 +266,7 @@ private:
     BufferCache buffer_cache;
     QueryCacheRuntime query_cache_runtime;
     QueryCache query_cache;
+    std::unique_ptr<MeshEmulation> mesh_emulation; ///< task/mesh programs without mesh shaders
     PipelineCache pipeline_cache;
     AccelerateDMA accelerate_dma;
     FenceManager fence_manager;
@@ -278,6 +282,7 @@ private:
     u32 render_trace_clears = 0;
     bool pending_native_work{};
     bool mesh_draw{}; ///< the draw being prepared uses a task/mesh pipeline
+    GraphicsPipeline* emulated_mesh_pipeline{}; ///< the same, emulated with compute passes
 
     struct IndirectTrace {
         vk::Buffer readback;

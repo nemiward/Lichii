@@ -91,6 +91,7 @@ class ComputePipeline;
 class DescriptorPool;
 class Device;
 class PipelineStatistics;
+class MeshEmulation;
 class RenderPassCache;
 class Scheduler;
 
@@ -127,6 +128,12 @@ public:
     ~PipelineCache();
 
     [[nodiscard]] GraphicsPipeline* CurrentGraphicsPipeline();
+
+    /// Lets graphics pipelines with task and mesh programs run on devices without
+    /// VK_EXT_mesh_shader (null: they are dropped).
+    void SetMeshEmulation(MeshEmulation* emulation) noexcept {
+        mesh_emulation = emulation;
+    }
 
     void TickFrame();
 
@@ -177,6 +184,7 @@ private:
     TextureCache& texture_cache;
     VideoCore::ShaderNotify& shader_notify;
     bool use_asynchronous_shaders{};
+    MeshEmulation* mesh_emulation{}; ///< set when task/mesh programs are emulated
     bool use_vulkan_pipeline_cache{};
     const size_t num_pipeline_workers;
     EmissionBudget emission_budget;

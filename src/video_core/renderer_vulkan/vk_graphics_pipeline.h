@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -75,6 +76,31 @@ class RescalingPushConstant;
 class RenderAreaPushConstant;
 class Scheduler;
 
+class MeshEmulation;
+
+/// A task/mesh pipeline run without VK_EXT_mesh_shader (see MESH_EMULATION.md): the task and mesh
+/// stages become compute pipelines and the draw is an indirect draw of `vertex_module`.
+struct EmulatedMeshStages {
+    MeshEmulation* system{};
+    vk::ShaderModule vertex_module; ///< draws what the mesh program wrote to its output slots
+    bool has_task{true};            ///< false: a mesh program alone, drawn with its own count
+    bool position_only{};           ///< writes only the position and its fragment shader has no textures
+    u32 task_stage{};               ///< indices of the task and mesh modules in the stage array
+    u32 mesh_stage{};
+    u64 task_hash{};
+    u64 mesh_hash{};
+    u32 payload_words{};
+    u32 slot_words{};
+    u32 max_primitives{};
+    u32 max_vertices{};
+    u32 attribute_base{};
+    std::vector<u32> vertex_lines;
+    bool task_warp_ops{}; ///< run the compute pipeline at the guest's warp size
+    bool mesh_warp_ops{};
+    u32 draws{};          ///< emulated draws so far (logged at powers of two)
+    u32 dumps{};          ///< buffer dumps taken (EDEN_NX2_MESH_EMU_DUMP_DIR)
+};
+
 class GraphicsPipeline {
     static constexpr size_t NUM_STAGES = Tegra::Engines::Maxwell3D::Regs::MaxShaderStage;
 
@@ -88,7 +114,8 @@ public:
         PipelineStatistics* pipeline_statistics, RenderPassCache& render_pass_cache,
         const GraphicsPipelineCacheKey& key, std::array<vk::ShaderModule, NUM_STAGES> stages,
         const std::array<const Shader::Info*, NUM_STAGES>& infos,
-        std::function<std::array<vk::ShaderModule, NUM_STAGES>()> emit_stages = {});
+        std::function<std::array<vk::ShaderModule, NUM_STAGES>()> emit_stages = {},
+        std::unique_ptr<EmulatedMeshStages> emulated_mesh_stages = {});
 
     static std::chrono::nanoseconds TakeHoldTime() noexcept;
 
@@ -123,8 +150,17 @@ public:
 
     /// Switch 2 task/mesh pipeline: drawn with vkCmdDrawMeshTasksEXT.
     [[nodiscard]] bool IsMeshPipeline() const noexcept {
-        return stage_infos[0].is_task || stage_infos[0].is_mesh;
+        return !emulated_mesh && (stage_infos[0].is_task || stage_infos[0].is_mesh);
     }
+
+    /// Task/mesh pipeline run as compute passes plus an indirect draw.
+    [[nodiscard]] bool IsEmulatedMesh() const noexcept {
+        return emulated_mesh != nullptr;
+    }
+
+    /// Records the emulated task, scan and mesh passes and the draw of what they wrote. Call
+    /// after Configure, in place of vkCmdDrawMeshTasksEXT. `task_groups` is the draw's count.
+    void DrawEmulatedMesh(u32 task_groups);
     GraphicsPipeline& operator=(GraphicsPipeline&&) noexcept = delete;
     GraphicsPipeline(GraphicsPipeline&&) noexcept = delete;
 
@@ -224,6 +260,10 @@ private:
     vk::PipelineLayout pipeline_layout;
     vk::DescriptorUpdateTemplate descriptor_update_template;
     vk::Pipeline pipeline;
+    std::unique_ptr<EmulatedMeshStages> emulated_mesh;
+    vk::Pipeline emulated_task_pipeline;
+    vk::Pipeline emulated_mesh_pipeline;
+    VkDescriptorSet emulated_stage_set{}; ///< set 0 of the last configured draw
 
     DescriptorBufferLayout descriptor_buffer_layout;
     std::vector<DescriptorUpdateEntry> last_descriptor_payload;

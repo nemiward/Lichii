@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <optional>
 
@@ -242,21 +243,44 @@ public:
         });
     }
 
+    /// Emulated task/mesh pipeline (see MESH_EMULATION.md): the guest stages' bindings are shared
+    /// by the graphics pipeline and the compute pipelines that stand in for the task and mesh
+    /// stages, so every binding is visible to both, and set 1 holds the emulation buffers.
+    void EnableMeshEmulation(VkDescriptorSetLayout emulation_set_layout_) {
+        mesh_emulation = true;
+        emulation_set_layout = emulation_set_layout_;
+    }
+
     vk::PipelineLayout CreatePipelineLayout(VkDescriptorSetLayout descriptor_set_layout) const {
         using Shader::Backend::SPIRV::RenderAreaLayout;
         using Shader::Backend::SPIRV::RescalingLayout;
         const u32 size_offset = is_compute ? sizeof(RescalingLayout::down_factor) : 0u;
         const VkPushConstantRange range{
             .stageFlags = static_cast<VkShaderStageFlags>(
-                is_compute ? VK_SHADER_STAGE_COMPUTE_BIT
-                           : (uses_mesh ? VK_SHADER_STAGE_ALL_GRAPHICS |
-                                              VK_SHADER_STAGE_TASK_BIT_EXT |
-                                              VK_SHADER_STAGE_MESH_BIT_EXT
-                                        : VK_SHADER_STAGE_ALL_GRAPHICS)),
+                mesh_emulation ? VK_SHADER_STAGE_ALL_GRAPHICS | VK_SHADER_STAGE_COMPUTE_BIT
+                : is_compute   ? VK_SHADER_STAGE_COMPUTE_BIT
+                               : (uses_mesh ? VK_SHADER_STAGE_ALL_GRAPHICS |
+                                                  VK_SHADER_STAGE_TASK_BIT_EXT |
+                                                  VK_SHADER_STAGE_MESH_BIT_EXT
+                                            : VK_SHADER_STAGE_ALL_GRAPHICS)),
             .offset = 0,
             .size = static_cast<u32>(sizeof(RescalingLayout)) - size_offset +
                     static_cast<u32>(sizeof(RenderAreaLayout)),
         };
+        if (mesh_emulation) {
+            // Set 0 always exists so the emulation buffers keep set index 1.
+            const std::array<VkDescriptorSetLayout, 2> set_layouts{descriptor_set_layout,
+                                                                    emulation_set_layout};
+            return device->GetLogical().CreatePipelineLayout({
+                .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+                .pNext = nullptr,
+                .flags = 0,
+                .setLayoutCount = static_cast<u32>(set_layouts.size()),
+                .pSetLayouts = set_layouts.data(),
+                .pushConstantRangeCount = 1,
+                .pPushConstantRanges = &range,
+            });
+        }
         return device->GetLogical().CreatePipelineLayout({
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = nullptr,
@@ -269,8 +293,13 @@ public:
     }
 
     void Add(const Shader::Info& info, VkShaderStageFlags stage) {
-        is_compute |= (stage & VK_SHADER_STAGE_COMPUTE_BIT) != 0;
-        uses_mesh |= (stage & (VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)) != 0;
+        if (mesh_emulation) {
+            stage = VK_SHADER_STAGE_ALL_GRAPHICS | VK_SHADER_STAGE_COMPUTE_BIT;
+        } else {
+            is_compute |= (stage & VK_SHADER_STAGE_COMPUTE_BIT) != 0;
+            uses_mesh |=
+                (stage & (VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT)) != 0;
+        }
 
         Add(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, stage, info.constant_buffer_descriptors);
         Add(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, stage, info.storage_buffers_descriptors);
@@ -309,6 +338,8 @@ private:
     const Device* device{};
     bool is_compute{};
     bool uses_mesh{};
+    bool mesh_emulation{};
+    VkDescriptorSetLayout emulation_set_layout{};
     boost::container::small_vector<VkDescriptorSetLayoutBinding, 32> bindings;
     boost::container::small_vector<VkDescriptorUpdateTemplateEntry, 32> entries;
     u32 binding{};

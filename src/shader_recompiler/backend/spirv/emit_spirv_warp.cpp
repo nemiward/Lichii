@@ -14,7 +14,7 @@ Id SubgroupScope(EmitContext& ctx) {
 }
 
 bool StageSupportsSubgroups(EmitContext& ctx) {
-    return ctx.profile.SupportsSubgroupStage(ctx.stage);
+    return ctx.profile.SupportsSubgroupStage(ctx.SubgroupStage());
 }
 
 Id GetThreadId(EmitContext& ctx) {

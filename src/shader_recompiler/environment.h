@@ -149,6 +149,16 @@ public:
         return mesh_primitive_header;
     }
 
+    /// Task and mesh programs that run as compute shaders (RuntimeInfo::emulate_mesh): the passes
+    /// that pick storage buffers treat them like compute programs, which may bind the entries of
+    /// the pointer tables they read.
+    void SetMeshRunsAsCompute(bool value) noexcept {
+        mesh_runs_as_compute = value;
+    }
+    [[nodiscard]] bool MeshRunsAsCompute() const noexcept {
+        return mesh_runs_as_compute;
+    }
+
 protected:
     ProgramHeader sph{};
     std::array<u32, 8> gp_passthrough_mask{};
@@ -157,6 +167,7 @@ protected:
     Stage stage{};
     u32 start_address{};
     bool is_proprietary_driver{};
+    bool mesh_runs_as_compute{};
 public:
     ::Common::unordered_map<CbufWordKey, u32, CbufWordKeyHash> cbuf_word_cache;
     ::Common::unordered_map<HandleKey,  u32, HandleKeyHash> handle_cache;
