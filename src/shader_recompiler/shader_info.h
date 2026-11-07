@@ -306,7 +306,7 @@ struct MeshSlotLayout {
     u32 slot_words{};
 };
 
-constexpr MeshSlotLayout MakeMeshSlotLayout(const MeshInfo& mesh) {
+inline MeshSlotLayout MakeMeshSlotLayout(const MeshInfo& mesh) {
     const auto groups = [](u32 count) { return (count + 31) / 32; };
     MeshSlotLayout layout;
     layout.primitive_base = groups(mesh.max_vertices) * static_cast<u32>(mesh.vertex_lines.size()) * 32;
