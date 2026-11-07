@@ -1704,7 +1704,8 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
     }
 }
 
-void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups) {
+void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
+                                        const std::function<void()>& after_renderpass) {
     const MeshEmulation::Decision decision{MeshEmulation::Decide(emulated_mesh->mesh_hash)};
     // Logged even when the filter keeps the pipeline off, to see which ones a scene uses.
     const u32 draw_number{++emulated_mesh->draws};
@@ -1794,6 +1795,9 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups) {
         return;
     }
     scheduler.RequestRenderpass(texture_cache.GetFramebuffer());
+    if (after_renderpass) {
+        after_renderpass();
+    }
     // The guest's depth comparison, to relax it for this draw and restore it after.
     const auto guest_depth_func{maxwell3d->regs.depth_test_func};
     const bool relax_depth{decision.depth_leq && key.state.extended_dynamic_state != 0 &&

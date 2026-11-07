@@ -1124,7 +1124,15 @@ void RasterizerVulkan::Draw(bool is_indexed, u32 instance_count) {
         }
 
         if (emulated_mesh_pipeline) {
-            emulated_mesh_pipeline->DrawEmulatedMesh(draw_params.num_vertices);
+            emulated_mesh_pipeline->DrawEmulatedMesh(draw_params.num_vertices, [this] {
+                // The emulation's compute passes closed the render pass, which paused the occlusion
+                // counter and the host conditional rendering. Restart both, as PrepareDraw did, or
+                // the guest's occlusion queries miss this draw's samples: Ocarina of Time then reads
+                // zero visible samples for its foliage depth prepass and disables the colour draws.
+                query_cache.NotifySegment(true);
+                query_cache.CounterEnable(VideoCommon::QueryType::ZPassPixelCount64,
+                                          maxwell3d->regs.zpass_pixel_count_enable);
+            });
             return;
         }
         if (mesh_draw && mesh_emulation_vertices_per_group != 0) {
