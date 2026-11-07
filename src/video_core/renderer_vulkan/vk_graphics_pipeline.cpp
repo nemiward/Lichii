@@ -1869,10 +1869,13 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
     std::array<VkBool32, Maxwell::NumRenderTargets> guest_enables{};
     for (size_t index = 0; index < guest_masks.size(); ++index) {
         const auto& mask{maxwell3d->regs.color_mask[maxwell3d->regs.color_mask_common ? 0 : index]};
-        guest_masks[index] = (mask.R ? VK_COLOR_COMPONENT_R_BIT : 0u) |
-                             (mask.G ? VK_COLOR_COMPONENT_G_BIT : 0u) |
-                             (mask.B ? VK_COLOR_COMPONENT_B_BIT : 0u) |
-                             (mask.A ? VK_COLOR_COMPONENT_A_BIT : 0u);
+        const auto bit = [](bool set, VkColorComponentFlagBits flag) -> VkColorComponentFlags {
+            return set ? static_cast<VkColorComponentFlags>(flag) : VkColorComponentFlags{0};
+        };
+        guest_masks[index] = bit(mask.R, VK_COLOR_COMPONENT_R_BIT) |
+                             bit(mask.G, VK_COLOR_COMPONENT_G_BIT) |
+                             bit(mask.B, VK_COLOR_COMPONENT_B_BIT) |
+                             bit(mask.A, VK_COLOR_COMPONENT_A_BIT);
         guest_enables[index] = guest_masks[index] != 0 ? VK_TRUE : VK_FALSE;
     }
     scheduler.Record([this, per_meshlet = decision.per_meshlet, relax_depth, relaxed_op, guest_depth_func,
