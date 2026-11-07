@@ -164,7 +164,9 @@ public:
 
     /// Records the emulated task, scan and mesh passes and the draw of what they wrote. Call
     /// after Configure, in place of vkCmdDrawMeshTasksEXT. `task_groups` is the draw's count.
-    void DrawEmulatedMesh(u32 task_groups);
+    /// after_renderpass runs once the render pass is open again, before the draw is recorded, to
+    /// restore the per-draw state that closing the render pass reset (occlusion queries).
+    void DrawEmulatedMesh(u32 task_groups, const std::function<void()>& after_renderpass = {});
     GraphicsPipeline& operator=(GraphicsPipeline&&) noexcept = delete;
     GraphicsPipeline(GraphicsPipeline&&) noexcept = delete;
 
