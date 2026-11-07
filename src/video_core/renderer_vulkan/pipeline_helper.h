@@ -396,11 +396,9 @@ public:
     if (image_view.SupportsDepthComparison()) {
         return false;
     }
-    const VideoCore::Surface::PixelFormat format{image_view.format};
-    return read_from_memory || VideoCore::Surface::IsPixelFormatInteger(format) ||
-           VideoCore::Surface::IsPixelFormatASTC(format) ||
-           VideoCore::Surface::IsPixelFormatBCn(format) ||
-           VideoCore::Surface::IsPixelFormatETC2(format);
+    // On devices where the format lacks VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_DEPTH_COMPARISON_BIT
+    // (such as AMD RADV with R32_SFLOAT / R16G16_SFLOAT), depth comparison is undefined and returns NaN.
+    return true;
 }
 
 inline void PushImageDescriptors(TextureCache& texture_cache,

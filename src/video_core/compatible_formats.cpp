@@ -91,6 +91,21 @@ constexpr std::array VIEW_CLASS_BPTC_FLOAT{
     PixelFormat::BC6H_UFLOAT,
 };
 
+constexpr std::array VIEW_CLASS_S3TC_DXT1_RGBA{
+    PixelFormat::BC1_RGBA_UNORM,
+    PixelFormat::BC1_RGBA_SRGB,
+};
+
+constexpr std::array VIEW_CLASS_S3TC_DXT3_RGBA{
+    PixelFormat::BC2_UNORM,
+    PixelFormat::BC2_SRGB,
+};
+
+constexpr std::array VIEW_CLASS_S3TC_DXT5_RGBA{
+    PixelFormat::BC3_UNORM,
+    PixelFormat::BC3_SRGB,
+};
+
 constexpr std::array VIEW_CLASS_ASTC_4x4_RGBA{
     PixelFormat::ASTC_2D_4X4_UNORM,
     PixelFormat::ASTC_2D_4X4_SRGB,
@@ -222,6 +237,9 @@ constexpr Table MakeViewTable() {
     EnableRange(view, VIEW_CLASS_RGTC2_RG);
     EnableRange(view, VIEW_CLASS_BPTC_UNORM);
     EnableRange(view, VIEW_CLASS_BPTC_FLOAT);
+    EnableRange(view, VIEW_CLASS_S3TC_DXT1_RGBA);
+    EnableRange(view, VIEW_CLASS_S3TC_DXT3_RGBA);
+    EnableRange(view, VIEW_CLASS_S3TC_DXT5_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_4x4_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_5x4_RGBA);
     EnableRange(view, VIEW_CLASS_ASTC_5x5_RGBA);
