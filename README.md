@@ -12,6 +12,29 @@
 
 # Lichii
 
+> [!IMPORTANT]
+> **Experimental fork, not the official Lichii.** The official project is
+> [zortos293/Lichii](https://github.com/zortos293/Lichii).
+
+This build makes The Legend of Zelda: Ocarina of Time (Switch 2) playable on GPUs without mesh
+shader support, such as the AMD RX 5700 XT. Models, grass and foliage that were missing or had no
+colour now draw correctly.
+
+**Tested on:** Ryzen 7 5700X, RX 5700 XT 8 GB, 32 GB DDR4 3200 MHz, Fedora Linux 44 (Mesa 26.2.4).
+Not tested on other GPUs yet.
+
+**How to use it:** nothing to set up. It turns on by itself on GPUs without mesh shaders and
+does nothing on the others. To turn it off, start Lichii with `EDEN_NX2_MESH_EMU=0`.
+
+**Compiling and installing on Linux:** clone this repository and run
+`dist/linux/install-lichii.sh`. It compiles Lichii and installs it for your user, with a `lichii`
+command and an entry in the applications menu (`--uninstall` removes it). The build dependencies
+are in [docs/Deps.md](docs/Deps.md).
+
+Back up your saves first.
+
+---
+
 Lichii is an experimental, open-source Nintendo Switch and Switch 2 emulator written in C++. It builds on Eglantine, Eden, yuzu and Sudachi, preserving their contributions while developing this fork's game compatibility and renderer fixes.
 
 This is an independent fork, not an official release of those upstream projects. Lichii is not affiliated with Nintendo.
@@ -58,37 +81,8 @@ The supplied Lichii logo, icon and library artwork are in [dist/branding](dist/b
 
 ## Support Lichii
 
-Lichii is free and stays free. If you want to help, you can donate in crypto. Donations help pay for the AI tools and build machines used to develop this open-source project faster.
-
-**Solana (SOL)**
-```text
-JepEjfyWjGjhJvHSrqj52KtLjcbbbmUh1iGqerYBF4w
-```
-
-**Ethereum (ETH)**
-```text
-0x055ABa1b80Bc35C836Ce7E9F47c2b3d6C75b5534
-```
-
-**Bitcoin (BTC)**
-```text
-bc1qcvxdpf4qvdhqp8ee4s355cjmxrzsphsdwpl8w4
-```
-
-**BNB Smart Chain (BNB)**
-```text
-0x055ABa1b80Bc35C836Ce7E9F47c2b3d6C75b5534
-```
-
-**Polygon**
-```text
-0x055ABa1b80Bc35C836Ce7E9F47c2b3d6C75b5534
-```
-
-Send each coin on its matching network. Coins sent on the wrong network can't be recovered.
-
-> [!NOTE]
-> Donations are voluntary gifts and are non-refundable. A donation does not buy any product, service, perk, early access, exclusive build, priority support or say in the project. Every release stays free and public for everyone.
+This fork does not take donations. To support Lichii, see the
+[official repository](https://github.com/zortos293/Lichii#support-lichii).
 
 ## Credits and license
 
