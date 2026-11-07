@@ -98,6 +98,9 @@ struct RuntimeInfo {
 
     bool convert_depth_mode{};
     bool force_early_z{};
+    /// Task and mesh programs run as compute shaders that exchange data through storage buffers,
+    /// for devices without VK_EXT_mesh_shader (see docs MESH_EMULATION.md).
+    bool emulate_mesh{};
 
     TessPrimitive tess_primitive{};
     TessSpacing tess_spacing{};

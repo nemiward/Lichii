@@ -33,7 +33,40 @@ Id Clamped(EmitContext& ctx, Id index, u32 count) {
     return ctx.OpUMin(ctx.U32[1], index, ctx.Const(count - 1));
 }
 
+// Emulated stage (RuntimeInfo::emulate_mesh): the workgroup is a plain compute workgroup and the
+// task/mesh exchange goes through storage buffers.
+Id EmuWord(EmitContext& ctx, Id buffer, Id index) {
+    return ctx.OpAccessChain(ctx.emu_u32_ptr, buffer, ctx.u32_zero_value, index);
+}
+
+Id GlobalWorkgroup(EmitContext& ctx) {
+    return ctx.OpCompositeExtract(ctx.U32[1], ctx.OpLoad(ctx.U32[3], ctx.workgroup_id), 0U);
+}
+
+// A mesh workgroup's entry in the group map: element 0 is its task workgroup, 1 its index there.
+Id MeshMapEntry(EmitContext& ctx, u32 element) {
+    const Id entry{ctx.OpIAdd(ctx.U32[1], ctx.OpIMul(ctx.U32[1], GlobalWorkgroup(ctx), ctx.Const(2U)),
+                              ctx.Const(element))};
+    return ctx.OpLoad(ctx.U32[1], EmuWord(ctx, ctx.emu_mesh_map, entry));
+}
+
+// The workgroup index the guest sees: the task workgroup, or a mesh workgroup's index within the
+// workgroups its task launched.
+Id GuestWorkgroup(EmitContext& ctx) {
+    if (ctx.emulate_mesh && ctx.stage == Stage::Mesh) {
+        return MeshMapEntry(ctx, 1);
+    }
+    return GlobalWorkgroup(ctx);
+}
+
 Id PayloadWord(EmitContext& ctx, Id index) {
+    if (ctx.emulate_mesh) {
+        const Id task{ctx.stage == Stage::Mesh ? MeshMapEntry(ctx, 0) : GlobalWorkgroup(ctx)};
+        const Id record{ctx.OpIMul(ctx.U32[1], task, ctx.Const(ctx.mesh_info.payload_words))};
+        return EmuWord(ctx, ctx.emu_task_records,
+                       ctx.OpIAdd(ctx.U32[1], record,
+                                  Clamped(ctx, index, ctx.mesh_info.payload_words)));
+    }
     return ctx.OpAccessChain(ctx.mesh_payload_u32, ctx.mesh_payload,
                              Clamped(ctx, index, ctx.mesh_info.payload_words));
 }
@@ -139,9 +172,48 @@ void ComputeTaskEpilogue(EmitContext& ctx) {
     }
 }
 
+// Copies `words` words of a workgroup array to the mesh output slot, `threads` words at a time.
+void CopyToSlot(EmitContext& ctx, Id slot_base, u32 first_word, u32 words, Id shared_array) {
+    const Id invocation{LocalInvocation(ctx)};
+    const u32 threads{ctx.mesh_threads};
+    for (u32 first = 0; first < words; first += threads) {
+        const Id word{ctx.OpIAdd(ctx.U32[1], invocation, ctx.Const(first))};
+        const auto copy = [&] {
+            const Id value{ctx.OpLoad(ctx.U32[1], SharedWord(ctx, shared_array, word))};
+            const Id target{ctx.OpIAdd(ctx.U32[1], slot_base,
+                                       ctx.OpIAdd(ctx.U32[1], word, ctx.Const(first_word)))};
+            ctx.OpStore(EmuWord(ctx, ctx.emu_mesh_slots, target), value);
+        };
+        if (first + threads > words) {
+            If(ctx, ctx.OpULessThan(ctx.U1, word, ctx.Const(words)), copy);
+        } else {
+            copy();
+        }
+    }
+}
+
+void EmulatedMeshEpilogue(EmitContext& ctx) {
+    const MeshInfo& mesh{ctx.mesh_info};
+    Barrier(ctx);
+    const Id slot_base{ctx.OpIMul(ctx.U32[1], GlobalWorkgroup(ctx), ctx.Const(ctx.emu_slot_words))};
+    const Id count{ctx.OpUMin(ctx.U32[1], ctx.OpLoad(ctx.U32[1], ctx.mesh_primitive_count),
+                              ctx.Const(mesh.max_primitives))};
+    If(ctx, ctx.OpIEqual(ctx.U1, LocalInvocation(ctx), ctx.u32_zero_value), [&] {
+        ctx.OpStore(EmuWord(ctx, ctx.emu_mesh_slots, slot_base), count);
+    });
+    CopyToSlot(ctx, slot_base, 1, ctx.mesh_map_bytes, ctx.mesh_map);
+    CopyToSlot(ctx, slot_base, 1 + ctx.mesh_map_bytes, ctx.mesh_attribute_words,
+               ctx.mesh_attributes);
+}
+
 void TaskEpilogue(EmitContext& ctx) {
     if (ctx.runtime_info.mesh_as_compute) {
         ComputeTaskEpilogue(ctx);
+        return;
+    }
+    if (ctx.emulate_mesh) {
+        // The count is word 1 of the record the guest wrote; the scan pass reads it from there.
+        Barrier(ctx);
         return;
     }
     Barrier(ctx);
@@ -233,6 +305,10 @@ void ComputeMeshEpilogue(EmitContext& ctx) {
 }
 
 void MeshEpilogue(EmitContext& ctx) {
+    if (ctx.emulate_mesh) {
+        EmulatedMeshEpilogue(ctx);
+        return;
+    }
     const MeshInfo& mesh{ctx.mesh_info};
     if (ctx.runtime_info.mesh_as_compute) {
         ComputeMeshEpilogue(ctx);
@@ -301,9 +377,13 @@ void MeshEpilogue(EmitContext& ctx) {
 }
 } // Anonymous namespace
 
+Id EmitMeshWorkgroupId(EmitContext& ctx) {
+    return ctx.OpCompositeConstruct(ctx.U32[3], GuestWorkgroup(ctx), ctx.u32_zero_value,
+                                    ctx.u32_zero_value);
+}
+
 Id EmitIsbeRead(EmitContext& ctx, Id address) {
-    const Id workgroup{
-        ctx.OpCompositeExtract(ctx.U32[1], ctx.OpLoad(ctx.U32[3], ctx.workgroup_id), 0U)};
+    const Id workgroup{GuestWorkgroup(ctx)};
     if (ctx.stage == Stage::Task) {
         return workgroup; // the input region holds the workgroup index (VERTEX_ID)
     }

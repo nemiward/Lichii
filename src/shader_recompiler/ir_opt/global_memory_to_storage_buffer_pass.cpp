@@ -1236,7 +1236,7 @@ small_vector<StorageBufferAddr, 4> NativePointerCandidates(const IR::U32& low_ad
                 if (std::ranges::find(candidates, pointer) != candidates.end()) {
                     return;
                 }
-                if (table && env.ShaderStage() != Stage::Compute) {
+                if (table && env.ShaderStage() != Stage::Compute && !env.MeshRunsAsCompute()) {
                     // Graphics programs bind every candidate for every draw: table entries
                     // multiply the storage buffers of draws that never read them.
                     return;

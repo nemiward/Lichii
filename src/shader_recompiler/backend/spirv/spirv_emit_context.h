@@ -185,8 +185,7 @@ public:
     /// Whether this stage has subgroup operations. Mesh emulation runs task and mesh programs
     /// as compute shaders, so they have what compute shaders have.
     [[nodiscard]] bool SupportsSubgroups() const {
-        return profile.SupportsSubgroupStage(runtime_info.mesh_as_compute ? Stage::Compute
-                                                                          : stage);
+        return profile.SupportsSubgroupStage(SubgroupStage());
     }
 
     Id Const(u32 value) {
@@ -432,6 +431,25 @@ public:
     Id mesh_task_args_buffer{};
     Id mesh_group_index{};
 
+    // RuntimeInfo::emulate_mesh. Storage buffers (u32 arrays):
+    //  - emu_task_records: one record of payload_words words per task workgroup; word 1 is the
+    //    number of mesh workgroups it launches. Written by the task, read by the mesh.
+    //  - emu_mesh_map (mesh): two words per mesh workgroup, {task workgroup, index within it}.
+    //  - emu_mesh_slots (mesh): emu_slot_words words per mesh workgroup: [0] primitive count,
+    //    then the vertex index map (one word per map byte), then the attribute lines.
+    bool emulate_mesh{};
+    /// The stage whose subgroup support applies: a task or mesh program run as a compute shader
+    /// (by either mesh emulation) is one, whatever the device says about the task and mesh
+    /// stages.
+    [[nodiscard]] Stage SubgroupStage() const noexcept {
+        return emulate_mesh || runtime_info.mesh_as_compute ? Stage::Compute : stage;
+    }
+    Id emu_task_records{};
+    Id emu_mesh_map{};
+    Id emu_mesh_slots{};
+    Id emu_u32_ptr{}; ///< StorageBuffer pointer to one word
+    u32 emu_slot_words{};
+
     Id load_const_func_u8{};
     Id load_const_func_u16{};
     Id load_const_func_u32{};
@@ -473,6 +491,7 @@ private:
     void DefineOutputs(const IR::Program& program);
     void DefineMesh(const IR::Program& program);
     void DefineMeshEmulationOutput();
+    void DefineMeshEmulation(IR::Program& program);
 };
 
 } // namespace Shader::Backend::SPIRV
