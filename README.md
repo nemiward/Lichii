@@ -12,6 +12,34 @@
 
 # Lichii
 
+> [!IMPORTANT]
+> **Experimental fork, not the official Lichii.** The official project is
+> [zortos293/Lichii](https://github.com/zortos293/Lichii).
+
+This build makes The Legend of Zelda: Ocarina of Time (Switch 2) playable on GPUs without mesh
+shader support, such as the AMD RX 5700 XT. Models, grass and foliage that were missing or had no
+colour now draw correctly.
+
+**Tested on:** Ryzen 7 5700X, RX 5700 XT 8 GB, 32 GB DDR4 3200 MHz, Fedora Linux 44 (Mesa 26.2.4).
+Not tested on other GPUs yet.
+
+**How to use it:** start Lichii with the environment variable `EDEN_NX2_MESH_EMU=1`.
+
+```sh
+# Linux
+EDEN_NX2_MESH_EMU=1 ./lichii
+```
+
+```bat
+:: Windows (cmd)
+set EDEN_NX2_MESH_EMU=1
+lichii.exe
+```
+
+Back up your saves first.
+
+---
+
 Lichii is an experimental, open-source Nintendo Switch and Switch 2 emulator written in C++. It builds on Eglantine, Eden, yuzu and Sudachi, preserving their contributions while developing this fork's game compatibility and renderer fixes.
 
 This is an independent fork, not an official release of those upstream projects. Lichii is not affiliated with Nintendo.
