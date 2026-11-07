@@ -4,6 +4,8 @@
 // SPDX-FileCopyrightText: Copyright 2021 yuzu Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <cstdlib>
+#include <string_view>
 #include <boost/container/static_vector.hpp>
 
 #include "common/settings.h"
@@ -607,6 +609,16 @@ Id EmitImageSampleImplicitLod(EmitContext& ctx, IR::Inst* inst, const IR::Value&
         color = Emit(&EmitContext::OpImageSparseSampleExplicitLod,
                     &EmitContext::OpImageSampleExplicitLod, ctx, inst, result_type,
                     Texture(ctx, info, index), coords, operands.Mask(), operands.Span());
+    }
+    if (ctx.emulate_mesh && ctx.stage == Stage::Fragment && !is_integer &&
+        ctx.debug_albedo.value == 0) {
+        static const bool albedo{[] {
+            const char* const mode{std::getenv("EDEN_NX2_MESH_EMU_FSDEBUG")};
+            return mode && std::string_view{mode} == "albedo";
+        }()};
+        if (albedo) {
+            ctx.debug_albedo = color;
+        }
     }
     return is_integer ? ctx.OpBitcast(ctx.F32[4], color) : color;
 }
