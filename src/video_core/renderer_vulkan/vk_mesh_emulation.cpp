@@ -64,7 +64,12 @@ void Barrier(vk::CommandBuffer cmdbuf, VkPipelineStageFlags src_stage, VkAccessF
 } // Anonymous namespace
 
 bool MeshEmulation::Enabled() {
-    static const bool enabled{std::getenv("EDEN_NX2_MESH_EMU") != nullptr};
+    // On by default: it only takes effect on devices without VK_EXT_mesh_shader (or with
+    // "force"). EDEN_NX2_MESH_EMU=0 turns it off.
+    static const bool enabled{[] {
+        const char* const value{std::getenv("EDEN_NX2_MESH_EMU")};
+        return value == nullptr || std::string_view{value} != "0";
+    }()};
     return enabled;
 }
 
