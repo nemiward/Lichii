@@ -362,7 +362,7 @@ void MeshEmulation::RecordPasses(vk::CommandBuffer cmdbuf, const Draw& draw,
         .max_mesh_groups = MaxMeshGroups(draw.slot_words),
         .vertices_per_group = draw.max_primitives * 3,
     };
-    const std::array<VkDescriptorSet, 2> sets{draw.stage_set, emulation_set};
+    const std::array<VkDescriptorSet, 2> stage_sets{draw.stage_set, emulation_set};
 
     // Everything recorded before: the guest's uploads and writes the programs read, and the
     // previous emulated draw's reads of the buffers this one overwrites.
@@ -373,7 +373,7 @@ void MeshEmulation::RecordPasses(vk::CommandBuffer cmdbuf, const Draw& draw,
 
     if (draw.task != VkPipeline{}) {
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, draw.task);
-        cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, draw.layout, 0, sets, {});
+        cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, draw.layout, 0, stage_sets, {});
         cmdbuf.Dispatch(task_groups, 1, 1);
     } else {
         // No task program: the mesh programs read an empty payload, the one record the scan maps
@@ -394,7 +394,7 @@ void MeshEmulation::RecordPasses(vk::CommandBuffer cmdbuf, const Draw& draw,
 
     // The scan's layout replaced the sets bound for the task.
     cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, draw.mesh);
-    cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, draw.layout, 0, sets, {});
+    cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, draw.layout, 0, stage_sets, {});
     cmdbuf.DispatchIndirect(*arguments, 0);
     if (per_meshlet) {
         // One draw command per mesh workgroup, from the primitive counts the mesh programs wrote.
