@@ -154,7 +154,7 @@ private:
             IAdd(attributes, IMul(OpShiftRightLogical(u32_type, vertex, U(5)), U(num_lines * 32)))};
         const Id vertex_slot{OpBitwiseAnd(u32_type, vertex, U(31))};
 
-        std::array<Id, 4> components{F(0.0f), F(0.0f), F(0.0f), F(0.0f)};
+        std::array<Id, 4> components{F(0.0f), F(0.0f), F(0.0f), F(1.0f)};
         std::map<u32, std::array<Id, 4>> generic_values;
         for (u32 position_in_slot = 0; position_in_slot < num_lines; ++position_in_slot) {
             const auto attribute{static_cast<IR::Attribute>(mesh.vertex_lines[position_in_slot])};
@@ -167,7 +167,7 @@ private:
             } else if (IR::IsGeneric(attribute)) {
                 auto& values{generic_values.try_emplace(IR::GenericAttributeIndex(attribute),
                                                         std::array<Id, 4>{F(0.0f), F(0.0f),
-                                                                          F(0.0f), F(0.0f)})
+                                                                          F(0.0f), F(1.0f)})
                                  .first->second};
                 values[IR::GenericAttributeElement(attribute)] =
                     LineValue(group_base, vertex_slot, position_in_slot);
@@ -198,7 +198,7 @@ private:
                 }
                 auto& values{primitive_values
                                  .try_emplace(IR::GenericAttributeIndex(attribute),
-                                              std::array<Id, 4>{F(0.0f), F(0.0f), F(0.0f), F(0.0f)})
+                                              std::array<Id, 4>{F(0.0f), F(0.0f), F(0.0f), F(1.0f)})
                                  .first->second};
                 values[IR::GenericAttributeElement(attribute)] =
                     LineValue(primitive_group_base, primitive_lane, position_in_slot);
