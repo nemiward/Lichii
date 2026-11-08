@@ -2009,7 +2009,10 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
                 }
                 return (vertex_generics & primitive_generics) == 0;
             }()};
-            const bool can_emulate{mesh_emulation_system != nullptr && mesh_info.topology == 4 &&
+            // Triangles, lines and points (0): Ocarina draws a foliage shadow map with points.
+            const bool known_topology{mesh_info.topology == 0 || mesh_info.topology == 1 ||
+                                      mesh_info.topology == 4};
+            const bool can_emulate{mesh_emulation_system != nullptr && known_topology &&
                                    lines_supported &&
                                    mesh_info.payload_words <= MeshEmulation::MAX_PAYLOAD_WORDS &&
                                    key.unique_hashes[static_cast<size_t>(
@@ -2304,6 +2307,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
             .slots_set = Shader::MESH_EMULATION_SET,
             .slots_binding = Shader::MESH_EMULATION_MESH_SLOTS,
             .convert_depth = mesh_convert_depth,
+            .point_size = std::bit_cast<float>(key.state.point_size),
         })};
         const auto uses_warp_ops = [](const Shader::Info& info) {
             return info.uses_subgroup_vote || info.uses_subgroup_invocation_id ||
@@ -2399,6 +2403,7 @@ std::unique_ptr<GraphicsPipeline> PipelineCache::CreateGraphicsPipeline(
         emulated_mesh_stages->payload_words = mesh_program.mesh.payload_words;
         emulated_mesh_stages->slot_words = slot_layout.slot_words;
         emulated_mesh_stages->max_primitives = mesh_program.mesh.max_primitives;
+        emulated_mesh_stages->primitive_vertices = mesh_program.mesh.PrimitiveVertices();
         emulated_mesh_stages->task_warp_ops = has_task_program && uses_warp_ops(task_program.info);
         emulated_mesh_stages->mesh_warp_ops = uses_warp_ops(mesh_program.info);
     }

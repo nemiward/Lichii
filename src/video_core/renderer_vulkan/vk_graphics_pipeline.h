@@ -115,6 +115,14 @@ struct EmulatedMeshStages {
     u32 payload_words{};
     u32 slot_words{};
     u32 max_primitives{};
+    u32 primitive_vertices{3}; ///< 1 points, 2 lines, 3 triangles (MeshInfo::PrimitiveVertices)
+
+    /// The mesh program's primitives as a list, whatever topology the guest set.
+    [[nodiscard]] VkPrimitiveTopology Topology() const noexcept {
+        return primitive_vertices == 1   ? VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+               : primitive_vertices == 2 ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST
+                                         : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    }
     u32 max_vertices{};
     u32 attribute_base{};
     std::vector<u32> vertex_lines;

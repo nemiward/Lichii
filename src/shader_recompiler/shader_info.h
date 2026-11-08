@@ -319,7 +319,9 @@ inline MeshSlotLayout MakeMeshSlotLayout(const MeshInfo& mesh) {
     if (layout.attribute_words == 0) {
         layout.attribute_words = 1;
     }
-    layout.map_words = 4 + 3 * mesh.max_primitives;
+    // The primitive count bytes, then one index byte per primitive vertex (as the mesh program
+    // writes its map, EmitContext::mesh_map_bytes).
+    layout.map_words = 4 + mesh.PrimitiveVertices() * mesh.max_primitives;
     layout.attribute_base = 1 + layout.map_words;
     layout.slot_words = MeshSlotWords(layout.map_words, layout.attribute_words);
     return layout;

@@ -4,7 +4,8 @@
 // After the emulated mesh programs ran (see MESH_EMULATION.md): one vkCmdDrawIndirect command per
 // mesh workgroup, so that gl_PrimitiveID starts at 0 in each of them as it does with mesh shaders.
 // Command g draws the primitives its slot holds, reading from the slot's first vertex
-// (g * max_primitives * 3) so the vertex shader finds its slot as it does for the single draw.
+// (g * max_primitives * k, k vertices per primitive) so the vertex shader finds its slot as it
+// does for the single draw.
 // The commands start at byte 64 of the arguments buffer; the scan pass wrote the count at word 8.
 
 #version 460 core
@@ -22,6 +23,7 @@ layout (std430, set = 0, binding = 1) buffer Arguments {
 layout (push_constant) uniform Parameters {
     uint slot_words;
     uint max_primitives;
+    uint primitive_vertices; // 1 points, 2 lines, 3 triangles
 };
 
 const uint COMMANDS_WORD = 16; // byte 64
@@ -31,9 +33,9 @@ void main() {
     for (uint group = gl_LocalInvocationID.x; group < total; group += 256) {
         const uint count = min(slots[group * slot_words], max_primitives);
         const uint command = COMMANDS_WORD + group * 4;
-        args[command + 0] = count * 3;                 // vertex count
-        args[command + 1] = 1;                         // instance count
-        args[command + 2] = group * max_primitives * 3; // first vertex
+        args[command + 0] = count * primitive_vertices;                  // vertex count
+        args[command + 1] = 1;                                           // instance count
+        args[command + 2] = group * max_primitives * primitive_vertices; // first vertex
         args[command + 3] = 0;                         // first instance
     }
 }

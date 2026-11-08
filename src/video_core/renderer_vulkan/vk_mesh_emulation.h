@@ -94,6 +94,7 @@ public:
         u32 payload_words;
         u32 slot_words;
         u32 max_primitives;
+        u32 primitive_vertices; ///< 1 points, 2 lines, 3 triangles
     };
 
     /// Records, outside a render pass: task workgroups, the scan that numbers the mesh

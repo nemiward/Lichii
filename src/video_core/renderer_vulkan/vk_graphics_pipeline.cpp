@@ -1277,8 +1277,9 @@ void GraphicsPipeline::MakePipeline(VkRenderPass render_pass) {
         }
     }
     if (emulated_mesh) {
-        // The mesh output slots are drawn as a list of triangles, whatever the guest set.
-        input_assembly_topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        // The mesh output slots are drawn as a list of the mesh program's primitives, whatever
+        // topology the guest set.
+        input_assembly_topology = emulated_mesh->Topology();
     }
     const VkPipelineInputAssemblyStateCreateInfo input_assembly_ci{
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
@@ -1813,6 +1814,7 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
                         .payload_words = emulated_mesh->payload_words,
                         .slot_words = emulated_mesh->slot_words,
                         .max_primitives = emulated_mesh->max_primitives,
+                        .primitive_vertices = emulated_mesh->primitive_vertices,
                     },
             per_meshlet);
         if (dump) {
@@ -1902,7 +1904,7 @@ void GraphicsPipeline::DrawEmulatedMesh(u32 task_groups,
                                  emulated_mesh->push_render_area.data());
         }
         if (key.state.extended_dynamic_state != 0) {
-            cmdbuf.SetPrimitiveTopologyEXT(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+            cmdbuf.SetPrimitiveTopologyEXT(emulated_mesh->Topology());
         }
         if (relax_depth) {
             cmdbuf.SetDepthCompareOpEXT(relaxed_op);

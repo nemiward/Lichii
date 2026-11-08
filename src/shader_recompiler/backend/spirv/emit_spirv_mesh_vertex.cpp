@@ -70,6 +70,17 @@ private:
         Decorate(position, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
         interfaces.push_back(position);
 
+        // Points must have a size: the program's own, or the fixed state one.
+        points = mesh.PrimitiveVertices() == 1;
+        writes_point_size = std::ranges::any_of(mesh.vertex_lines, [](u32 line) {
+            return static_cast<IR::Attribute>(line) == IR::Attribute::PointSize;
+        });
+        if (points && !writes_point_size) {
+            point_size = AddGlobalVariable(TypePointer(spv::StorageClass::Output, f32_type),
+                                           spv::StorageClass::Output);
+            Decorate(point_size, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
+            interfaces.push_back(point_size);
+        }
         for (const u32 line : mesh.vertex_lines) {
             const auto attribute{static_cast<IR::Attribute>(line)};
             if (attribute == IR::Attribute::PointSize && !Sirit::ValidId(point_size)) {
@@ -89,7 +100,7 @@ private:
                 }
             }
         }
-        // Per-primitive attributes: flat outputs, the same value at the three corners.
+        // Per-primitive attributes: flat outputs, the same value at every corner.
         for (const u32 line : mesh.primitive_lines) {
             const auto attribute{static_cast<IR::Attribute>(line)};
             if (!IR::IsGeneric(attribute)) {
@@ -129,11 +140,12 @@ private:
                                  TypeFunction(void_type))};
         AddLabel();
 
+        const u32 corners{mesh.PrimitiveVertices()};
         const Id vertex_id{OpLoad(u32_type, vertex_index)};
-        const Id triangle{OpUDiv(u32_type, vertex_id, U(3))};
-        const Id corner{OpUMod(u32_type, vertex_id, U(3))};
-        const Id group{OpUDiv(u32_type, triangle, U(mesh.max_primitives))};
-        const Id primitive{OpUMod(u32_type, triangle, U(mesh.max_primitives))};
+        const Id primitive_index{OpUDiv(u32_type, vertex_id, U(corners))};
+        const Id corner{OpUMod(u32_type, vertex_id, U(corners))};
+        const Id group{OpUDiv(u32_type, primitive_index, U(mesh.max_primitives))};
+        const Id primitive{OpUMod(u32_type, primitive_index, U(mesh.max_primitives))};
         const Id slot_base{IMul(group, U(mesh.emu_slot_words))};
         const auto load_word = [&](Id index) {
             return OpLoad(u32_type, OpAccessChain(word_pointer, slots, U(0), index));
@@ -142,8 +154,9 @@ private:
         const Id valid{OpULessThan(bool_type, primitive, primitive_count)};
 
         // The map is one word per byte, after the primitive count: indices of the primitive's
-        // corners start at byte 4 + 3 * primitive.
-        const Id map_word{IAdd(slot_base, IAdd(U(1 + 4), IAdd(IMul(primitive, U(3)), corner)))};
+        // corners start at byte 4 + corners * primitive.
+        const Id map_word{
+            IAdd(slot_base, IAdd(U(1 + 4), IAdd(IMul(primitive, U(corners)), corner)))};
         // Corner indices come from the guest: keep a bad one inside the vertices the mesh declared.
         const Id vertex{OpUMin(u32_type, OpSelect(u32_type, valid, load_word(map_word), U(0)),
                                U(mesh.max_vertices - 1))};
@@ -155,6 +168,9 @@ private:
         const Id vertex_slot{OpBitwiseAnd(u32_type, vertex, U(31))};
 
         std::array<Id, 4> components{F(0.0f), F(0.0f), F(0.0f), F(1.0f)};
+        if (points && !writes_point_size) {
+            OpStore(point_size, F(params.point_size));
+        }
         std::map<u32, std::array<Id, 4>> generic_values;
         for (u32 position_in_slot = 0; position_in_slot < num_lines; ++position_in_slot) {
             const auto attribute{static_cast<IR::Attribute>(mesh.vertex_lines[position_in_slot])};
@@ -214,8 +230,10 @@ private:
             components[2] = OpFMul(f32_type, OpFAdd(f32_type, components[2], components[3]), F(0.5f));
         }
         const Id live{OpCompositeConstruct(vec4_type, std::span{components})};
-        // Collapsed primitives: every corner at the same point, so nothing is rasterized.
-        const Id collapsed{OpCompositeConstruct(vec4_type, F(0.0f), F(0.0f), F(0.0f), F(1.0f))};
+        // Unused primitives: a triangle collapsed to one point rasterizes nothing; a point or a
+        // line has to leave the clip volume instead (x and y past w).
+        const float away{corners == 3 ? 0.0f : 2.0f};
+        const Id collapsed{OpCompositeConstruct(vec4_type, F(away), F(away), F(0.0f), F(1.0f))};
         const Id splat{OpCompositeConstruct(TypeVector(bool_type, 4), valid, valid, valid, valid)};
         OpStore(position, OpSelect(vec4_type, splat, live, collapsed));
         OpReturn();
@@ -234,6 +252,8 @@ private:
     Id vertex_index{};
     Id position{};
     Id point_size{};
+    bool points{};            ///< the mesh program outputs points
+    bool writes_point_size{}; ///< and writes their size itself
     std::map<u32, Id> generics;
     std::map<u32, Id> primitive_generics;
     std::vector<Id> interfaces;

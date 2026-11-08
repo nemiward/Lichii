@@ -26,6 +26,7 @@ constexpr VkShaderStageFlags EMULATION_STAGES =
 struct FinalizeParameters {
     u32 slot_words;
     u32 max_primitives;
+    u32 primitive_vertices;
 };
 
 struct ScanParameters {
@@ -365,7 +366,7 @@ void MeshEmulation::RecordPasses(vk::CommandBuffer cmdbuf, const Draw& draw,
         // 0 tells the scan there is no task program: task_groups already counts mesh workgroups.
         .record_words = draw.task != VkPipeline{} ? draw.payload_words : 0,
         .max_mesh_groups = MaxMeshGroups(draw.slot_words),
-        .vertices_per_group = draw.max_primitives * 3,
+        .vertices_per_group = draw.max_primitives * draw.primitive_vertices,
     };
     const std::array<VkDescriptorSet, 2> stage_sets{draw.stage_set, emulation_set};
 
@@ -408,6 +409,7 @@ void MeshEmulation::RecordPasses(vk::CommandBuffer cmdbuf, const Draw& draw,
         const FinalizeParameters finalize_parameters{
             .slot_words = draw.slot_words,
             .max_primitives = draw.max_primitives,
+            .primitive_vertices = draw.primitive_vertices,
         };
         cmdbuf.BindPipeline(VK_PIPELINE_BIND_POINT_COMPUTE, *finalize_pipeline);
         cmdbuf.BindDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE, *finalize_layout, 0,
