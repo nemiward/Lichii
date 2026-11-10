@@ -158,8 +158,10 @@ Id OutputWord(EmitContext& ctx, Id index) {
                              index);
 }
 
-// Mesh emulation (RuntimeInfo::mesh_as_compute): writes this workgroup's block of the output
-// buffer, laid out as MeshEmulationBlockWords describes, instead of the mesh outputs.
+/// Mesh emulation (RuntimeInfo::mesh_as_compute): writes this workgroup's block of the output
+/// buffer, laid out as MeshEmulationBlockWords describes, instead of the mesh outputs. Each
+/// primitive stores PrimitiveVertices() indices (1 for a point, 2 for a line, 3 for a triangle);
+/// slots past the primitive count get the marker the vertex shader culls.
 void ComputeMeshEpilogue(EmitContext& ctx) {
     const MeshInfo& mesh{ctx.mesh_info};
     Barrier(ctx);
@@ -454,6 +456,9 @@ void EmitMeshEpilogue(EmitContext& ctx) {
     }
 }
 
+/// Builds the vertex shader that draws the emulation's output (see the declaration in
+/// emit_spirv.h). Points also write PointSize, and points and lines past the primitive count are
+/// moved outside the clip volume and culled with a negative ClipDistance.
 std::vector<u32> EmitMeshEmulationVertex(const Profile& profile, const MeshInfo& mesh, u32 binding,
                                          u32 args_binding, bool convert_depth, float point_size) {
     Sirit::Module module{profile.supported_spirv};

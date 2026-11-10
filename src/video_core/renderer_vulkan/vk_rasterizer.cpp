@@ -279,6 +279,9 @@ void RecordDispatchBarrier(vk::CommandBuffer cmdbuf) {
 }
 } // Anonymous namespace
 
+/// Reads back the mesh emulation's output for the probe frame and logs how many primitives of
+/// PrimitiveVertices() indices it holds: unused slots, primitives with every vertex off screen
+/// and bad indices.
 void RasterizerVulkan::ReadMeshEmulationProbe() {
     const MeshEmulationProbe probe{mesh_probe};
     mesh_probe.pending = false;
@@ -773,6 +776,8 @@ bool RasterizerVulkan::TryNx2IndirectReset(bool is_indexed, u32 instance_count) 
     return true;
 }
 
+/// Common start of every draw: resolves the pipeline and the bound resources, then calls
+/// `draw_func` to record the draw itself. A draw that cannot be prepared is skipped and logged.
 template <typename Func>
 void RasterizerVulkan::PrepareDraw(bool is_indexed, Func&& draw_func, bool is_indirect) {
 
